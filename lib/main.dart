@@ -1,0 +1,322 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Photo Contacts',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const ContactsScreen(),
+    );
+  }
+}
+
+class ContactsScreen extends StatefulWidget {
+  const ContactsScreen({super.key});
+
+  @override
+  State<ContactsScreen> createState() => _ContactsScreenState();
+}
+
+class _ContactsScreenState extends State<ContactsScreen> {
+  List<Contact> _allContacts = [];
+  List<Contact> _filteredContacts = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContacts();
+    _searchController.addListener(_filterContacts);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Feature 3: Pull-to-Refresh Mechanism
+  Future<void> _fetchContacts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      if (await Permission.contacts.request().isGranted) {
+        List<Contact> contacts = await FlutterContacts.getAll(
+          properties: ContactProperties.all,
+        );
+
+        setState(() {
+          _allContacts = contacts;
+          _filteredContacts = contacts;
+          _isLoading = false;
+        });
+
+        _filterContacts();
+      } else {
+        setState(() {
+          _errorMessage = 'Contacts permission is required to use this app.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading contacts: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Feature 1: Search Query Core Matching Engine
+  void _filterContacts() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredContacts = _allContacts;
+      } else {
+        _filteredContacts = _allContacts.where((contact) {
+          // Fix 1: Add fallback for nullable displayName
+          final name = (contact.displayName ?? '').toLowerCase();
+          final String phone = contact.phones.isNotEmpty
+              ? (contact.phones.first.number ?? '').replaceAll(
+                  RegExp(r'[^\d]'),
+                  '',
+                )
+              : '';
+          return name.contains(query) || phone.contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  Future<void> _makeNormalCall(String number) async {
+    final Uri callUri = Uri.parse(
+      "tel:${number.replaceAll(RegExp(r'[^\d+]'), '')}",
+    );
+    if (await canLaunchUrl(callUri)) {
+      await launchUrl(callUri);
+    }
+  }
+
+  Future<void> _launchWhatsApp(String number) async {
+    String cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
+    final Uri waUri = Uri.parse("whatsapp://send?phone=$cleanNumber");
+
+    if (await canLaunchUrl(waUri)) {
+      await launchUrl(waUri);
+    } else {
+      await launchUrl(waUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showActionDialog(Contact contact) {
+    // Fix 2: Explicit fallback for nullable phone number
+    final String phoneNumber = contact.phones.isNotEmpty
+        ? (contact.phones.first.number ?? '')
+        : '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          contact.displayName ?? 'No Name',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Choose communication shortcut:',
+          style: TextStyle(fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              if (phoneNumber.isNotEmpty) _makeNormalCall(phoneNumber);
+            },
+            icon: const Icon(Icons.call, size: 28),
+            label: const Text('Call', style: TextStyle(fontSize: 18)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              if (phoneNumber.isNotEmpty) _launchWhatsApp(phoneNumber);
+            },
+            icon: const Icon(Icons.message, color: Colors.green, size: 28),
+            label: const Text('WhatsApp', style: TextStyle(fontSize: 18)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Photo Contacts',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26),
+        ),
+        backgroundColor: Colors.deepPurple.shade50,
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Search Input UI Component
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 18),
+              decoration: InputDecoration(
+                hintText: 'Search by name or number...',
+                prefixIcon: const Icon(Icons.search, size: 26),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+
+          // Pull-To-Refresh Render Core
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage.isNotEmpty
+                ? Center(
+                    child: Text(
+                      _errorMessage,
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : _filteredContacts.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No contacts found',
+                      style: TextStyle(fontSize: 20, color: Colors.grey),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchContacts,
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _filteredContacts.length,
+                      itemBuilder: (context, index) {
+                        final contact = _filteredContacts[index];
+                        final thumbBytes = contact.photo?.thumbnail;
+                        final hasPhoto =
+                            thumbBytes != null && thumbBytes.isNotEmpty;
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => _showActionDialog(contact),
+                            // Fix 3 & 4: Fallback for nullable contact ID
+                            onLongPress: () => FlutterContacts.native
+                                .showEditor(contact.id ?? ''),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 50,
+                                    backgroundColor: Colors.deepPurple.shade100,
+                                    backgroundImage: hasPhoto
+                                        ? MemoryImage(thumbBytes)
+                                        : null,
+                                    child: !hasPhoto
+                                        ? const Icon(
+                                            Icons.person,
+                                            size: 50,
+                                            color: Colors.white,
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          contact.displayName ?? 'No Name',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          contact.phones.isNotEmpty
+                                              ? (contact.phones.first.number ??
+                                                    'No Number')
+                                              : 'No Number',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
