@@ -60,7 +60,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
     try {
       if (await Permission.contacts.request().isGranted) {
         List<Contact> contacts = await FlutterContacts.getAll(
-          properties: ContactProperties.all,
+          withProperties: true,
+          withPhoto: true,
         );
 
         setState(() {
@@ -91,9 +92,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _filteredContacts = _allContacts;
       } else {
         _filteredContacts = _allContacts.where((contact) {
-          final name = (contact.displayName ?? '').toLowerCase();
+          final name = (contact.displayName.isEmpty) 
+              ? '${contact.name.first} ${contact.name.last}'.trim().toLowerCase()
+              : contact.displayName.toLowerCase();
           final String phone = contact.phones.isNotEmpty 
-              ? (contact.phones.first.number ?? '').replaceAll(RegExp(r'[^\d]'), '') 
+              ? (contact.phones.first.number).replaceAll(RegExp(r'[^\d]'), '') 
               : '';
           return name.contains(query) || phone.contains(query);
         }).toList();
@@ -120,7 +123,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showActionDialog(Contact contact) {
-    final String phoneNumber = contact.phones.isNotEmpty ? (contact.phones.first.number ?? '') : '';
+    final String phoneNumber = contact.phones.isNotEmpty ? contact.phones.first.number : '';
+    final String contactName = contact.displayName.trim().isEmpty 
+        ? '${contact.name.first} ${contact.name.last}'.trim() 
+        : contact.displayName;
 
     showDialog(
       context: context,
@@ -130,7 +136,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         titlePadding: const EdgeInsets.only(top: 24, bottom: 20),
         contentPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 28),
         title: Text(
-          contact.displayName ?? 'No Name',
+          contactName.isEmpty ? 'No Name' : contactName,
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
@@ -139,7 +145,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 1. Phone Call Square Button
+              // 1. Phone Call Square Button (Deep Purple Accent)
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -164,7 +170,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
               ),
               const SizedBox(width: 24),
-              // 2. Beautiful Re-engineered Genuine WhatsApp Styled Logo Button
+              // 2. Crisp WhatsApp Video Call Square Button (Green Accent)
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -189,17 +195,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // The solid green speech bubble base shape
+                        // Solid WhatsApp green speech bubble background layout
                         const Icon(
                           Icons.chat_bubble, 
                           size: 48, 
                           color: Colors.green
                         ),
-                        // Inner offset layer to embed a crisp white phone receiver inside the chat base
+                        // Crisp white video camera action symbol nested right inside the bubble core
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 4, right: 1),
+                          padding: const EdgeInsets.only(bottom: 4),
                           child: Icon(
-                            Icons.call, 
+                            Icons.videocam, 
                             size: 24, 
                             color: Colors.grey.shade50
                           ),
@@ -266,6 +272,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                 final contact = _filteredContacts[index];
                                 final thumbBytes = contact.photo?.thumbnail;
                                 final hasPhoto = thumbBytes != null && thumbBytes.isNotEmpty;
+                                final String displayName = contact.displayName.trim().isEmpty 
+                                    ? '${contact.name.first} ${contact.name.last}'.trim() 
+                                    : contact.displayName;
 
                                 return Card(
                                   margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -275,9 +284,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                     onTap: () => _showActionDialog(contact),
                                     onLongPress: () {
-                                      final dynamic idValue = contact.id;
-                                      if (idValue != null) {
-                                        FlutterContacts.native.showEditor(idValue.toString());
+                                      if (contact.id.isNotEmpty) {
+                                        FlutterContacts.native.showEditor(contact.id);
                                       }
                                     },
                                     child: Padding(
@@ -298,14 +306,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  contact.displayName ?? 'No Name',
+                                                  displayName.isEmpty ? 'No Name' : displayName,
                                                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
                                                 const SizedBox(height: 6),
                                                 Text(
-                                                  contact.phones.isNotEmpty ? (contact.phones.first.number ?? 'No Number') : 'No Number',
+                                                  contact.phones.isNotEmpty ? contact.phones.first.number : 'No Number',
                                                   style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
                                                 ),
                                               ],
