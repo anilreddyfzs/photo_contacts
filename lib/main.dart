@@ -51,7 +51,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
-  // Feature 3: Pull-to-Refresh Mechanism
   Future<void> _fetchContacts() async {
     setState(() {
       _isLoading = true;
@@ -85,7 +84,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
-  // Feature 1: Search Query Core Matching Engine
   void _filterContacts() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -93,7 +91,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _filteredContacts = _allContacts;
       } else {
         _filteredContacts = _allContacts.where((contact) {
-          // Fix 1: Add fallback for nullable displayName
           final name = (contact.displayName ?? '').toLowerCase();
           final String phone = contact.phones.isNotEmpty
               ? (contact.phones.first.number ?? '').replaceAll(
@@ -128,7 +125,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showActionDialog(Contact contact) {
-    // Fix 2: Explicit fallback for nullable phone number
     final String phoneNumber = contact.phones.isNotEmpty
         ? (contact.phones.first.number ?? '')
         : '';
@@ -136,41 +132,83 @@ class _ContactsScreenState extends State<ContactsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: 40,
+        ), // Stops it expanding across the screen width
+        titlePadding: const EdgeInsets.only(top: 24, bottom: 16),
+        contentPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 28),
         title: Text(
           contact.displayName ?? 'No Name',
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
-        content: const Text(
-          'Choose communication shortcut:',
-          style: TextStyle(fontSize: 18),
-          textAlign: TextAlign.center,
+        content: IntrinsicWidth(
+          child: Row(
+            mainAxisSize: MainAxisSize
+                .min, // Keeps container wrapped snugly around elements
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 1. Phone Call Square Button
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  if (phoneNumber.isNotEmpty) _makeNormalCall(phoneNumber);
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 85,
+                  height: 85,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.call,
+                    size: 42,
+                    color: Colors.deepPurple,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              // 2. WhatsApp Message Square Button
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  if (phoneNumber.isNotEmpty) _launchWhatsApp(phoneNumber);
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 85,
+                  height: 85,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline,
+                    size: 42,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        actionsAlignment: MainAxisAlignment.spaceEvenly,
-        actions: [
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              if (phoneNumber.isNotEmpty) _makeNormalCall(phoneNumber);
-            },
-            icon: const Icon(Icons.call, size: 28),
-            label: const Text('Call', style: TextStyle(fontSize: 18)),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              if (phoneNumber.isNotEmpty) _launchWhatsApp(phoneNumber);
-            },
-            icon: const Icon(Icons.message, color: Colors.green, size: 28),
-            label: const Text('WhatsApp', style: TextStyle(fontSize: 18)),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -188,7 +226,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
       body: Column(
         children: [
-          // Search Input UI Component
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(
@@ -213,8 +250,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
               ),
             ),
           ),
-
-          // Pull-To-Refresh Render Core
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -256,7 +291,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () => _showActionDialog(contact),
-                            // Fix 3 & 4: Fallback for nullable contact ID
                             onLongPress: () => FlutterContacts.native
                                 .showEditor(contact.id ?? ''),
                             child: Padding(
