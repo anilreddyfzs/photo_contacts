@@ -109,7 +109,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _launchWhatsApp(String number) async {
-    String cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
+    final String cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
     final Uri waUri = Uri.parse("whatsapp://send?phone=$cleanNumber");
     
     if (await canLaunchUrl(waUri)) {
@@ -154,7 +154,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
@@ -164,7 +164,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
               ),
               const SizedBox(width: 24),
-              // 2. WhatsApp Logo Square Button
+              // 2. Beautiful Re-engineered Genuine WhatsApp Styled Logo Button
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -179,17 +179,32 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       )
                     ],
                   ),
-                  // Render the dedicated WhatsApp Unicode Glyph at a high-res scale
-                  child: const Center(
-                    child: Text(
-                      ' WhatsApp symbol placeholder ', // Replaced cleanly with a beautifully styled matching accent
-                      style: TextStyle(display: TextDisplay.none),
+                  child: Center(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // The solid green speech bubble base shape
+                        const Icon(
+                          Icons.chat_bubble, 
+                          size: 48, 
+                          color: Colors.green
+                        ),
+                        // Inner offset layer to embed a crisp white phone receiver inside the chat base
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4, right: 1),
+                          child: Icon(
+                            Icons.call, 
+                            size: 24, 
+                            color: Colors.grey.shade50
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -259,7 +274,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(16),
                                     onTap: () => _showActionDialog(contact),
-                                    onLongPress: () => FlutterContacts.native.showEditor(contact.id ?? ''),
+                                    onLongPress: () {
+                                      final dynamic idValue = contact.id;
+                                      if (idValue != null) {
+                                        FlutterContacts.native.showEditor(idValue.toString());
+                                      }
+                                    },
                                     child: Padding(
                                       padding: const EdgeInsets.all(16.0),
                                       child: Row(
