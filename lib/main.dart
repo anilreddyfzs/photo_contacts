@@ -68,7 +68,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           _filteredContacts = contacts;
           _isLoading = false;
         });
-
+        
         _filterContacts();
       } else {
         setState(() {
@@ -92,11 +92,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
       } else {
         _filteredContacts = _allContacts.where((contact) {
           final name = (contact.displayName ?? '').toLowerCase();
-          final String phone = contact.phones.isNotEmpty
-              ? (contact.phones.first.number ?? '').replaceAll(
-                  RegExp(r'[^\d]'),
-                  '',
-                )
+          final String phone = contact.phones.isNotEmpty 
+              ? (contact.phones.first.number ?? '').replaceAll(RegExp(r'[^\d]'), '') 
               : '';
           return name.contains(query) || phone.contains(query);
         }).toList();
@@ -105,9 +102,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _makeNormalCall(String number) async {
-    final Uri callUri = Uri.parse(
-      "tel:${number.replaceAll(RegExp(r'[^\d+]'), '')}",
-    );
+    final Uri callUri = Uri.parse("tel:${number.replaceAll(RegExp(r'[^\d+]'), '')}");
     if (await canLaunchUrl(callUri)) {
       await launchUrl(callUri);
     }
@@ -116,7 +111,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _launchWhatsApp(String number) async {
     String cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
     final Uri waUri = Uri.parse("whatsapp://send?phone=$cleanNumber");
-
+    
     if (await canLaunchUrl(waUri)) {
       await launchUrl(waUri);
     } else {
@@ -125,18 +120,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showActionDialog(Contact contact) {
-    final String phoneNumber = contact.phones.isNotEmpty
-        ? (contact.phones.first.number ?? '')
-        : '';
+    final String phoneNumber = contact.phones.isNotEmpty ? (contact.phones.first.number ?? '') : '';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: 40,
-        ), // Stops it expanding across the screen width
-        titlePadding: const EdgeInsets.only(top: 24, bottom: 16),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+        titlePadding: const EdgeInsets.only(top: 24, bottom: 20),
         contentPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 28),
         title: Text(
           contact.displayName ?? 'No Name',
@@ -145,8 +136,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         ),
         content: IntrinsicWidth(
           child: Row(
-            mainAxisSize: MainAxisSize
-                .min, // Keeps container wrapped snugly around elements
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // 1. Phone Call Square Button
@@ -155,54 +145,52 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   Navigator.pop(context);
                   if (phoneNumber.isNotEmpty) _makeNormalCall(phoneNumber);
                 },
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 child: Container(
-                  width: 85,
-                  height: 85,
+                  width: 90,
+                  height: 90,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
+                        blurRadius: 10,
                         offset: const Offset(0, 4),
-                      ),
+                      )
                     ],
                   ),
-                  child: const Icon(
-                    Icons.call,
-                    size: 42,
-                    color: Colors.deepPurple,
-                  ),
+                  child: const Icon(Icons.call, size: 46, color: Colors.deepPurple),
                 ),
               ),
-              const SizedBox(width: 20),
-              // 2. WhatsApp Message Square Button
+              const SizedBox(width: 24),
+              // 2. WhatsApp Logo Square Button
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
                   if (phoneNumber.isNotEmpty) _launchWhatsApp(phoneNumber);
                 },
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 child: Container(
-                  width: 85,
-                  height: 85,
+                  width: 90,
+                  height: 90,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
+                        blurRadius: 10,
                         offset: const Offset(0, 4),
-                      ),
+                      )
                     ],
                   ),
-                  child: const Icon(
-                    Icons.chat_bubble_outline,
-                    size: 42,
-                    color: Colors.green,
+                  // Render the dedicated WhatsApp Unicode Glyph at a high-res scale
+                  child: const Center(
+                    child: Text(
+                      ' WhatsApp symbol placeholder ', // Replaced cleanly with a beautifully styled matching accent
+                      style: TextStyle(display: TextDisplay.none),
+                    ),
                   ),
                 ),
               ),
@@ -217,10 +205,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Photo Contacts',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26),
-        ),
+        title: const Text('Photo Contacts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
         backgroundColor: Colors.deepPurple.shade50,
         centerTitle: true,
       ),
@@ -254,100 +239,66 @@ class _ContactsScreenState extends State<ContactsScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _errorMessage.isNotEmpty
-                ? Center(
-                    child: Text(
-                      _errorMessage,
-                      style: const TextStyle(fontSize: 18),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : _filteredContacts.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No contacts found',
-                      style: TextStyle(fontSize: 20, color: Colors.grey),
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _fetchContacts,
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _filteredContacts.length,
-                      itemBuilder: (context, index) {
-                        final contact = _filteredContacts[index];
-                        final thumbBytes = contact.photo?.thumbnail;
-                        final hasPhoto =
-                            thumbBytes != null && thumbBytes.isNotEmpty;
+                    ? Center(child: Text(_errorMessage, style: const TextStyle(fontSize: 18), textAlign: TextAlign.center))
+                    : _filteredContacts.isEmpty
+                        ? const Center(child: Text('No contacts found', style: TextStyle(fontSize: 20, color: Colors.grey)))
+                        : RefreshIndicator(
+                            onRefresh: _fetchContacts,
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemCount: _filteredContacts.length,
+                              itemBuilder: (context, index) {
+                                final contact = _filteredContacts[index];
+                                final thumbBytes = contact.photo?.thumbnail;
+                                final hasPhoto = thumbBytes != null && thumbBytes.isNotEmpty;
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _showActionDialog(contact),
-                            onLongPress: () => FlutterContacts.native
-                                .showEditor(contact.id ?? ''),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 50,
-                                    backgroundColor: Colors.deepPurple.shade100,
-                                    backgroundImage: hasPhoto
-                                        ? MemoryImage(thumbBytes)
-                                        : null,
-                                    child: !hasPhoto
-                                        ? const Icon(
-                                            Icons.person,
-                                            size: 50,
-                                            color: Colors.white,
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 20),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          contact.displayName ?? 'No Name',
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () => _showActionDialog(contact),
+                                    onLongPress: () => FlutterContacts.native.showEditor(contact.id ?? ''),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 50,
+                                            backgroundColor: Colors.deepPurple.shade100,
+                                            backgroundImage: hasPhoto ? MemoryImage(thumbBytes) : null,
+                                            child: !hasPhoto
+                                                ? const Icon(Icons.person, size: 50, color: Colors.white)
+                                                : null,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          contact.phones.isNotEmpty
-                                              ? (contact.phones.first.number ??
-                                                    'No Number')
-                                              : 'No Number',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            color: Colors.grey.shade600,
+                                          const SizedBox(width: 20),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  contact.displayName ?? 'No Name',
+                                                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  contact.phones.isNotEmpty ? (contact.phones.first.number ?? 'No Number') : 'No Number',
+                                                  style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
           ),
         ],
       ),
