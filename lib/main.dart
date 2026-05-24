@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,6 +35,7 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   List<Contact> _allContacts = [];
   List<Contact> _filteredContacts = [];
+  List<String> _favoriteIds = [];
   bool _isLoading = true;
   String _errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
@@ -41,7 +43,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchContacts();
+    _loadFavoritesAndFetchContacts();
     _searchController.addListener(_filterContacts);
   }
 
@@ -49,6 +51,31 @@ class _ContactsScreenState extends State<ContactsScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFavoritesAndFetchContacts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _favoriteIds = prefs.getStringList('favorite_contact_ids') ?? [];
+      });
+    } catch (_) {}
+    await _fetchContacts();
+  }
+
+  Future<void> _toggleFavorite(String contactId) async {
+    setState(() {
+      if (_favoriteIds.contains(contactId)) {
+        _favoriteIds.remove(contactId);
+      } else {
+        _favoriteIds.add(contactId);
+      }
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('favorite_contact_ids', _favoriteIds);
+    } catch (_) {}
   }
 
   Future<void> _fetchContacts() async {
@@ -60,7 +87,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
     try {
       if (await Permission.contacts.request().isGranted) {
         List<Contact> contacts = await FlutterContacts.getAll(
-          properties: ContactProperties.all,
+          properties: {
+            ContactProperty.name,
+            ContactProperty.phone,
+            ContactProperty.photoThumbnail,
+          },
         );
 
         setState(() {
@@ -68,7 +99,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           _filteredContacts = contacts;
           _isLoading = false;
         });
-
+        
         _filterContacts();
       } else {
         setState(() {
@@ -91,13 +122,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _filteredContacts = _allContacts;
       } else {
         _filteredContacts = _allContacts.where((contact) {
-          // Fix 1: Guard against null displayName using fallback string
           final String name = (contact.displayName ?? '').toLowerCase();
-          final String phone = contact.phones.isNotEmpty
-              ? (contact.phones.first.number ?? '').replaceAll(
-                  RegExp(r'[^\d]'),
-                  '',
-                )
+          final String phone = contact.phones.isNotEmpty 
+              ? (contact.phones.first.number ?? '').replaceAll(RegExp(r'[^\d]'), '') 
               : '';
           return name.contains(query) || phone.contains(query);
         }).toList();
@@ -106,9 +133,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Future<void> _makeNormalCall(String number) async {
-    final Uri callUri = Uri.parse(
-      "tel:${number.replaceAll(RegExp(r'[^\d+]'), '')}",
-    );
+    final Uri callUri = Uri.parse("tel:${number.replaceAll(RegExp(r'[^\d+]'), '')}");
     if (await canLaunchUrl(callUri)) {
       await launchUrl(callUri);
     }
@@ -117,7 +142,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _launchWhatsApp(String number) async {
     final String cleanNumber = number.replaceAll(RegExp(r'[^\d]'), '');
     final Uri waUri = Uri.parse("whatsapp://send?phone=$cleanNumber");
-
+    
     if (await canLaunchUrl(waUri)) {
       await launchUrl(waUri);
     } else {
@@ -126,254 +151,276 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   void _showActionDialog(Contact contact) {
-    final String phoneNumber = contact.phones.isNotEmpty
-        ? (contact.phones.first.number ?? '')
-        : '';
-    // Fix 2: Cast nullable type value cleanly to String variable
+    final String phoneNumber = contact.phones.isNotEmpty ? (contact.phones.first.number ?? '') : '';
     final String contactName = contact.displayName ?? '';
+    final thumbBytes = contact.photo?.thumbnail;
+    final hasPhoto = thumbBytes != null && thumbBytes.isNotEmpty;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      barrierDismissible: true,
+      builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 40),
-        titlePadding: const EdgeInsets.only(top: 24, bottom: 20),
-        contentPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 28),
-        title: Text(
-          contactName.isEmpty ? 'No Name' : contactName,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        content: IntrinsicWidth(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 1. Phone Call Square Button
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  if (phoneNumber.isNotEmpty) _makeNormalCall(phoneNumber);
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.call,
-                    size: 46,
-                    color: Colors.deepPurple,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24),
-              // 2. Video Call Speech Bubble Shortcut
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  if (phoneNumber.isNotEmpty) _launchWhatsApp(phoneNumber);
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble,
-                          size: 48,
-                          color: Colors.green,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Icon(
-                            Icons.videocam,
-                            size: 24,
-                            color: Colors.grey.shade50,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Photo Contacts',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26),
-        ),
-        backgroundColor: Colors.deepPurple.shade50,
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(fontSize: 18),
-              decoration: InputDecoration(
-                hintText: 'Search by name or number...',
-                prefixIcon: const Icon(Icons.search, size: 26),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => _searchController.clear(),
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage.isNotEmpty
-                ? Center(
-                    child: Text(
-                      _errorMessage,
-                      style: const TextStyle(fontSize: 18),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 32, bottom: 28, left: 24, right: 24),
+              child: IntrinsicWidth(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      contactName.isEmpty ? 'No Name' : contactName,
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
-                  )
-                : _filteredContacts.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No contacts found',
-                      style: TextStyle(fontSize: 20, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    CircleAvatar(
+                      radius: 46,
+                      backgroundColor: Colors.deepPurple.shade50,
+                      backgroundImage: hasPhoto ? MemoryImage(thumbBytes) : null,
+                      child: !hasPhoto
+                          ? Icon(Icons.person, size: 46, color: Colors.deepPurple.shade200)
+                          : null,
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _fetchContacts,
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _filteredContacts.length,
-                      itemBuilder: (context, index) {
-                        final contact = _filteredContacts[index];
-                        final thumbBytes = contact.photo?.thumbnail;
-                        final hasPhoto =
-                            thumbBytes != null && thumbBytes.isNotEmpty;
-                        // Fix 3: Handle nullable displayName in row template item view
-                        final String displayName = contact.displayName ?? '';
-
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Phone Call Square
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            if (phoneNumber.isNotEmpty) {
+                              _makeNormalCall(phoneNumber);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: const Icon(Icons.call, size: 46, color: Colors.deepPurple),
                           ),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _showActionDialog(contact),
-                            onLongPress: () {
-                              // Fix 4: Handle string variable assignment parameter safely
-                              final String currentId = contact.id ?? '';
-                              if (currentId.isNotEmpty) {
-                                FlutterContacts.native.showEditor(currentId);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Row(
+                        ),
+                        const SizedBox(width: 24),
+                        // Video Call Square
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            if (phoneNumber.isNotEmpty) {
+                              _launchWhatsApp(phoneNumber);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: Center(
+                              child: Stack(
+                                alignment: Alignment.center,
                                 children: [
-                                  CircleAvatar(
-                                    radius: 50,
-                                    backgroundColor: Colors.deepPurple.shade100,
-                                    backgroundImage: hasPhoto
-                                        ? MemoryImage(thumbBytes)
-                                        : null,
-                                    child: !hasPhoto
-                                        ? const Icon(
-                                            Icons.person,
-                                            size: 50,
-                                            color: Colors.white,
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 20),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          displayName.isEmpty
-                                              ? 'No Name'
-                                              : displayName,
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          contact.phones.isNotEmpty
-                                              ? (contact.phones.first.number ??
-                                                    'No Number')
-                                              : 'No Number',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  const Icon(Icons.chat_bubble, size: 48, color: Colors.green),
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Icon(Icons.videocam, size: 24, color: Colors.grey.shade50),
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: Icon(Icons.close_rounded, color: Colors.grey.shade500, size: 26),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactsListView(List<Contact> contactsList) {
+    if (contactsList.isEmpty) {
+      return const Center(
+        child: Text('No contacts found', style: TextStyle(fontSize: 18, color: Colors.grey)),
+      );
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: contactsList.length,
+      itemBuilder: (context, index) {
+        final contact = contactsList[index];
+        final String currentId = contact.id ?? '';
+        final isFav = _favoriteIds.contains(currentId);
+        final thumbBytes = contact.photo?.thumbnail;
+        final hasPhoto = thumbBytes != null && thumbBytes.isNotEmpty;
+        final String displayName = contact.displayName ?? '';
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _showActionDialog(contact),
+            onLongPress: () {
+              if (currentId.isNotEmpty) {
+                FlutterContacts.native.showEditor(currentId);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: Colors.deepPurple.shade100,
+                    backgroundImage: hasPhoto ? MemoryImage(thumbBytes) : null,
+                    child: !hasPhoto ? const Icon(Icons.person, size: 36, color: Colors.white) : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName.isEmpty ? 'No Name' : displayName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          contact.phones.isNotEmpty ? (contact.phones.first.number ?? 'No Number') : 'No Number',
+                          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        ),
+                      ],
                     ),
                   ),
+                  IconButton(
+                    icon: Icon(
+                      isFav ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: isFav ? Colors.amber : Colors.grey.shade400,
+                      size: 30,
+                    ),
+                    onPressed: () {
+                      if (currentId.isNotEmpty) {
+                        _toggleFavorite(currentId);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favoriteContacts = _filteredContacts.where((c) => _favoriteIds.contains(c.id ?? '')).toList();
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Photo Contacts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
+          backgroundColor: Colors.deepPurple.shade50,
+          centerTitle: true,
+          bottom: const TabBar(
+            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            unselectedLabelStyle: TextStyle(fontSize: 16),
+            indicatorColor: Colors.deepPurple,
+            labelColor: Colors.deepPurple,
+            tabs: [
+              Tab(icon: Icon(Icons.star_rounded, size: 26)),
+              Tab(text: 'All Contacts'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: TextField(
+                controller: _searchController,
+                style: const TextStyle(fontSize: 18),
+                decoration: InputDecoration(
+                  hintText: 'Search by name or number...',
+                  prefixIcon: const Icon(Icons.search, size: 26),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => _searchController.clear(),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage.isNotEmpty
+                      ? Center(child: Text(_errorMessage, style: const TextStyle(fontSize: 18), textAlign: TextAlign.center))
+                      : TabBarView(
+                          children: [
+                            RefreshIndicator(
+                              onRefresh: _fetchContacts,
+                              child: _buildContactsListView(favoriteContacts),
+                            ),
+                            RefreshIndicator(
+                              onRefresh: _fetchContacts,
+                              child: _buildContactsListView(_filteredContacts),
+                            ),
+                          ],
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }
