@@ -151,7 +151,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 1. Phone Call Square Button (Deep Purple Accent)
+              // 1. Phone Call Square Button
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -166,7 +166,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        // Fixed compiling blocker: Fallback to highly compatible opacity structure
+                        color: Colors.black.withOpacity(0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -180,7 +181,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
               ),
               const SizedBox(width: 24),
-              // 2. Crisp WhatsApp Video Call Square Button (Green Accent)
+              // 2. High-Fidelity Custom Video Call Speech Bubble Shortcut
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -195,7 +196,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        // Fixed compiling blocker: Fallback to highly compatible opacity structure
+                        color: Colors.black.withOpacity(0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -205,13 +207,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Solid WhatsApp green speech bubble background layout
                         const Icon(
                           Icons.chat_bubble,
                           size: 48,
                           color: Colors.green,
                         ),
-                        // Crisp white video camera action symbol nested right inside the bubble core
                         Padding(
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Icon(
