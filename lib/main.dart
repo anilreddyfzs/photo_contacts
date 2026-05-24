@@ -60,8 +60,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     try {
       if (await Permission.contacts.request().isGranted) {
         List<Contact> contacts = await FlutterContacts.getAll(
-          withProperties: true,
-          withPhoto: true,
+          properties: ContactProperties.all,
         );
 
         setState(() {
@@ -92,13 +91,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
         _filteredContacts = _allContacts;
       } else {
         _filteredContacts = _allContacts.where((contact) {
-          final name = (contact.displayName.isEmpty)
-              ? '${contact.name.first} ${contact.name.last}'
-                    .trim()
-                    .toLowerCase()
-              : contact.displayName.toLowerCase();
+          // Fix 1: Guard against null displayName using fallback string
+          final String name = (contact.displayName ?? '').toLowerCase();
           final String phone = contact.phones.isNotEmpty
-              ? (contact.phones.first.number).replaceAll(RegExp(r'[^\d]'), '')
+              ? (contact.phones.first.number ?? '').replaceAll(
+                  RegExp(r'[^\d]'),
+                  '',
+                )
               : '';
           return name.contains(query) || phone.contains(query);
         }).toList();
@@ -128,11 +127,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   void _showActionDialog(Contact contact) {
     final String phoneNumber = contact.phones.isNotEmpty
-        ? contact.phones.first.number
+        ? (contact.phones.first.number ?? '')
         : '';
-    final String contactName = contact.displayName.trim().isEmpty
-        ? '${contact.name.first} ${contact.name.last}'.trim()
-        : contact.displayName;
+    // Fix 2: Cast nullable type value cleanly to String variable
+    final String contactName = contact.displayName ?? '';
 
     showDialog(
       context: context,
@@ -166,8 +164,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        // Fixed compiling blocker: Fallback to highly compatible opacity structure
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -181,7 +178,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
               ),
               const SizedBox(width: 24),
-              // 2. High-Fidelity Custom Video Call Speech Bubble Shortcut
+              // 2. Video Call Speech Bubble Shortcut
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
@@ -196,8 +193,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        // Fixed compiling blocker: Fallback to highly compatible opacity structure
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -297,11 +293,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         final thumbBytes = contact.photo?.thumbnail;
                         final hasPhoto =
                             thumbBytes != null && thumbBytes.isNotEmpty;
-                        final String displayName =
-                            contact.displayName.trim().isEmpty
-                            ? '${contact.name.first} ${contact.name.last}'
-                                  .trim()
-                            : contact.displayName;
+                        // Fix 3: Handle nullable displayName in row template item view
+                        final String displayName = contact.displayName ?? '';
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
@@ -316,8 +309,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             borderRadius: BorderRadius.circular(16),
                             onTap: () => _showActionDialog(contact),
                             onLongPress: () {
-                              if (contact.id.isNotEmpty) {
-                                FlutterContacts.native.showEditor(contact.id);
+                              // Fix 4: Handle string variable assignment parameter safely
+                              final String currentId = contact.id ?? '';
+                              if (currentId.isNotEmpty) {
+                                FlutterContacts.native.showEditor(currentId);
                               }
                             },
                             child: Padding(
@@ -358,7 +353,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                         const SizedBox(height: 6),
                                         Text(
                                           contact.phones.isNotEmpty
-                                              ? contact.phones.first.number
+                                              ? (contact.phones.first.number ??
+                                                    'No Number')
                                               : 'No Number',
                                           style: TextStyle(
                                             fontSize: 18,
