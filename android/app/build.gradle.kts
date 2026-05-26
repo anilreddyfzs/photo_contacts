@@ -42,7 +42,7 @@ android {
         applicationId = "com.riyago.photocontacts" 
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = flutter.versionName
     }
 
